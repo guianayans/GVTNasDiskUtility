@@ -371,7 +371,7 @@ MIT
 
 ---
 
-# ✨ Criado por Gui Anayans
+# ✨ Criado por Guianayans
 
 Open-source, moderno e acessível.
 Sinta-se livre para abrir issues, contribuir ou sugerir melhorias.
