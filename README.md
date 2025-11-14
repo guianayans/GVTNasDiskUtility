@@ -1,23 +1,84 @@
-# **GVTNas Disk Utility**
+Segue um **README.md totalmente revisado**, claro, profissional e com a nova sessão completa sobre **WireGuard + acesso remoto seguro**, além de instruções de **DDNS (NO-IP)**, **port forwarding**, **roteadores comuns**, e tudo que alguém precisa para instalar o GVTNas em qualquer servidor e usar remotamente sem quebrar nada.
 
-Painel web moderno inspirado no Disk Utility do macOS para administração de discos, partições, volumes e compartilhamentos SMB diretamente em um contêiner Docker.
-Compatível com discos externos, Time Machine, Clonezilla e diversos filesystems suportados pelo kernel Linux.
-
----
-
-## **📦 Stack Tecnológica**
-
-* **Backend:** Node.js 20 + Express + TypeScript
-* **Frontend:** React + Vite + TailwindCSS
-* **Infra interna do container:** `smbd`, `udisks2`, `lsblk`, `blkid`, `mount/umount`
-* **Deploy:** Docker Compose (privileged)
-* **Ambiente:** Totalmente isolado do host; Samba e utilitários rodam apenas dentro do container.
+Está no tom certo para documentação pública, sem expor nada sensível, e mantendo o app elegante.
 
 ---
 
-## **🧩 Docker Compose (oficial)**
+# ✔️ **README.md atualizado (versão final)**
 
-Este projeto utiliza o seguinte `docker-compose.yml`:
+````md
+# GVTNas Disk Utility
+
+Painel web moderno inspirado no Disk Utility do macOS para administração de discos, volumes, partições, Time Machine, Clonezilla e compartilhamentos SMB — tudo isolado dentro de um container Docker.
+
+O GVTNas transforma qualquer servidor Linux em um NAS elegante e funcional, com UI moderna, hotplug USB, montagens seguras via `udisks2` e compartilhamento Samba totalmente automatizado.
+
+---
+
+# 📦 Stack Tecnológica
+
+- **Backend:** Node.js 20 + Express + TypeScript  
+- **Frontend:** React + Vite + TailwindCSS  
+- **Sistema de arquivos:** `lsblk`, `udisksctl`, `mount/umount`, `blkid`  
+- **Serviços internos:** `smbd`, `udisks2`  
+- **Deploy:** Docker Compose (modo privileged)  
+
+Todo o gerenciamento (montagem, permissões, shares) ocorre **inteiramente dentro do container**, mantendo o host limpo.
+
+---
+
+# ⚙️ Pré-requisitos
+
+- Linux com Docker + Docker Compose  
+- A pasta do projeto **deve estar** em:  
+  `/pendriver/GVTNas/`
+- Kernel com suporte aos filesystems desejados (ext4, exfat, ntfs, etc.)
+- Suporte a hotplug USB (normal em qualquer distro)
+- Roteador com IPv4 público ou DDNS
+
+---
+
+# 🚀 Subindo a aplicação
+
+## 1. Clonar o repositório
+
+```bash
+git clone https://github.com/SEU_USUARIO/GVTNasDiskUtility.git
+cd GVTNasDiskUtility
+````
+
+## 2. Criar o arquivo `.env`
+
+```bash
+cp .env.example .env
+```
+
+Preencha pelo menos:
+
+```env
+APP_PASSWORD=senha-do-painel
+NAS_SMB_PASSWORD=senha-do-samba
+PUBLIC_SMB_HOST=seu-dominio-ddns
+PUBLIC_BASE_URL=http://seu-ip-ou-dominio:3010
+NAS_SMB_USER=nasuser
+NAS_SMB_GROUP=nasuser
+```
+
+## 3. Subir com Docker Compose
+
+```bash
+docker compose up -d
+```
+
+Acesse:
+
+```
+http://SEU_IP:3010
+```
+
+---
+
+# 📑 Docker Compose Oficial
 
 ```yaml
 services:
@@ -71,208 +132,173 @@ services:
 
 ---
 
-## **🔧 Pré-requisitos do Host**
+# 🌐 Acesso Remoto Seguro (WireGuard VPN)
 
-O host **não** precisa ter Samba instalado.
+O acesso SMB pela internet **NÃO funciona de forma segura** e muitos ISPs bloqueiam portas 445/139.
+Para acesso externo 100% funcional (iOS, macOS, Windows), use **WireGuard**.
 
-O host precisa apenas:
-
-1. Docker + Docker Compose
-2. Pasta do projeto localizada em:
-
-   ```
-   /pendriver/GVTNas
-   ```
-3. Permitir acesso privilegiado ao container (para acesso a `/dev`, `/run/udev`, etc.)
-4. Ter suporte no kernel aos filesystems desejados (ex.: NTFS, ExFAT, EXT4).
-5. USBs e discos externos devem aparecer normalmente em `/dev/sdX` no sistema.
+O servidor passa a ser acessado como se você estivesse na mesma rede local.
 
 ---
 
-## **🚀 Inicialização**
+# 🔐 Instalando o WireGuard (Docker + Coolify)
 
-### 1. Clonar o repositório
+## 1. Criar pasta de configuração:
 
 ```bash
-git clone https://github.com/SEU_USUARIO/GVTNasDiskUtility.git
-cd GVTNasDiskUtility
+sudo mkdir -p /pendriver/wireguard/config
+sudo chmod -R 777 /pendriver/wireguard
 ```
 
-### 2. Criar o arquivo `.env`
+## 2. Criar novo app Docker no Coolify e colar:
+
+```yaml
+services:
+  wireguard:
+    image: linuxserver/wireguard
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=America/Sao_Paulo
+      - SERVERURL=SEU_DDNS
+      - SERVERPORT=51820
+      - PEERS=iphone,macbook,windows
+      - PEERDNS=1.1.1.1
+      - INTERNAL_SUBNET=10.10.0.0
+    volumes:
+      - /pendriver/wireguard/config:/config
+      - /lib/modules:/lib/modules
+    ports:
+      - 51820:51820/udp
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+```
+
+## 3. Deployar
+
+Serão criados arquivos como:
+
+```
+/pendriver/wireguard/config/peer_iphone/peer_iphone.png
+```
+
+Escaneie esse QR Code no app **WireGuard** (iOS/Android).
+
+---
+
+# 📡 Acesso Remoto ao GVTNas via VPN
+
+Depois de conectado à VPN, acesse:
+
+### Interface Web:
+
+```
+http://10.10.0.1:3010
+```
+
+### SMB:
+
+```
+smb://10.10.0.1
+```
+
+Total compatibilidade com:
+
+* iPhone (app Arquivos)
+* macOS Finder
+* Windows Explorer
+
+---
+
+# 🌍 Configuração de DDNS (NO-IP)
+
+1. Crie conta em: [https://www.noip.com](https://www.noip.com)
+2. Crie um hostname (ex.: `seuservidor.ddns.net`)
+3. Instale o cliente NO-IP no servidor:
 
 ```bash
-cp .env.example .env
+sudo apt install noip2 -y
+sudo noip2 -C
 ```
 
-Preencher:
-
-```env
-APP_PASSWORD=senha-do-painel
-NAS_SMB_PASSWORD=
-PUBLIC_SMB_HOST=
-PUBLIC_BASE_URL=http://SEU_IP:3010
-NAS_SMB_USER=nasuser
-NAS_SMB_GROUP=nasuser
-```
-
-### 3. Subir o serviço
+4. Verifique:
 
 ```bash
-docker compose up -d
-```
-
-A interface ficará disponível em:
-
-```
-http://SEU_IP:3010
+sudo systemctl status noip2
 ```
 
 ---
 
-## **📑 Detalhes da Inicialização do Container**
+# 🔧 Port Forwarding Necessário
 
-Durante o boot, o container executa:
+No roteador, abra:
 
-1. `apt-get update`
-2. Instalação de:
+| Serviço       | Porta | Protocolo | Para                 |
+| ------------- | ----- | --------- | -------------------- |
+| **GVTNas**    | 3010  | TCP       | IP local do servidor |
+| **WireGuard** | 51820 | UDP       | IP local do servidor |
 
-   * `samba`
-   * `samba-common-bin`
-   * `udisks2`
-   * `ntfs-3g`
-   * `exfatprogs`
-3. Criação automática do usuário Samba interno:
-
-   ```
-   nasuser / NAS_SMB_PASSWORD
-   ```
-4. Início do serviço `smbd`
-5. Build e inicialização da aplicação:
-
-   * `npm ci`
-   * `npm run build`
-   * `npm start`
-
-Isso garante que o app funciona **em qualquer máquina nova**, sem depender de configuração extra no host.
+**NÃO abra portas 445 ou 139** na internet.
+SMB só deve ser usado via WireGuard (segurança + funcionamento garantido).
 
 ---
 
-## **📂 Recursos principais**
+# 📁 Recursos do GVTNas
 
-### **Gerenciamento de discos**
+### ✓ Árvore completa de discos/partições
 
-* Visualização completa via `lsblk` e `udisks2`
-* Árvore de dispositivos com discos → partições → volumes
-* Detecção automática de hotplug USB
+### ✓ Montagem automática de volumes
 
-### **Montagem**
+### ✓ Explorador de arquivos em `/mnt` e `/media`
 
-* Montagem segura via `udisksctl`
-* Ajuste automático de permissões
-* Suporte a NTFS, EXFAT, EXT4 e outros
+### ✓ Hotplug USB monitorado
 
-### **Compartilhamento SMB**
+### ✓ Compartilhamentos SMB automáticos
 
-* Configuração automática no arquivo `smb.conf`
-* Reinicialização limpa do `smbd`
-* Compatível com:
+### ✓ Perfis de Time Machine / Clonezilla
 
-  * Windows Explorer
-  * Finder (macOS)
-  * App Arquivos (iOS)
-  * Linux (Nautilus / Dolphin)
+### ✓ Mapeamento de usuários interno
 
-### **Explorador de Arquivos**
+### ✓ Logs detalhados
 
-* Navegação segura dentro de `/mnt` e `/media`
-* Breadcrumb, download e pré-visualização
-
-### **Time Machine / Clonezilla**
-
-* Criação de shares específicos com parâmetros Apple
-* Habilitar/desabilitar via API e interface
+### ✓ API REST completa
 
 ---
 
-## **🌐 Variáveis de Ambiente**
+# 🛠 Troubleshooting
 
-| Variável              | Descrição                                                                                 |
-| --------------------- | ----------------------------------------------------------------------------------------- |
-| `APP_PASSWORD`        | **Obrigatória.** Senha usada pelo overlay de login do painel web (share com Vite via `VITE_APP_PASSWORD`). |
-| `NAS_SMB_PASSWORD`    | **Obrigatória.** Senha usada para o usuário Samba interno (`nasuser` por padrão).          |
-| `NAS_SMB_USER`        | Nome do usuário Samba (padrão: `nasuser`).                                                |
-| `NAS_SMB_GROUP`       | Grupo Samba utilizado nos `force user/group` (padrão: `nasuser`).                         |
-| `PUBLIC_SMB_HOST`     | Hostname/IP público exibido nos links de conexão SMB dentro do painel.                    |
-| `PUBLIC_BASE_URL`     | URL pública utilizada pelo frontend para chamadas HTTP (padrão: `http://localhost:3010`).|
-| `SAMBA_CONFIG_PATH`   | Caminho do `smb.conf` dentro do container (padrão: `/etc/samba/smb.conf`).                |
-| `VITE_APP_PASSWORD`   | Opcional no `.env`: se não definido, o valor de `APP_PASSWORD` será reutilizado pelo build do frontend. |
-| `MOUNT_BASE`          | Base onde os volumes são montados (`/media/gvtnas` por padrão).                           |
-| `MIN_DEVICE_BYTES`    | Discos abaixo desse tamanho (padrão 3 GB) são considerados partições do sistema e ignorados. |
-| `ALLOWED_MOUNT_ROOTS` | Lista de roots permitidos para o explorador e mounts (padrão `/mnt,/media`).              |
-| `SHARE_STATE_PATH`    | Caminho do arquivo JSON que guarda o estado dos shares (opcional).                        |
-| `SAMBA_USERNAME_MAP`  | Caminho do `username.map` usado para mapear logins para `nasuser`.                        |
-| `VITE_API_BASE_URL`   | URL da API usada pelo frontend em modo dev/build (padrão: `http://localhost:3010`).        |
+### Disco não aparece
 
----
+* Verifique se `/run/udev` está montado no container
 
-## **📜 Endpoints Principais**
+### Samba não autentica
 
-| Método | Caminho                     | Função                        |
-| ------ | --------------------------- | ----------------------------- |
-| GET    | `/api/disks`                | Lista discos e partições      |
-| POST   | `/api/mount`                | Monta dispositivo             |
-| POST   | `/api/unmount`              | Desmonta                      |
-| GET    | `/api/fs/list`              | Lista arquivos                |
-| GET    | `/api/fs/download`          | Baixa arquivo                 |
-| POST   | `/api/time-machine/enable`  | Ativa share Time Machine      |
-| POST   | `/api/time-machine/disable` | Desativa                      |
-| POST   | `/api/clonezilla/enable`    | Ativa share Clonezilla        |
-| POST   | `/api/clonezilla/disable`   | Desativa                      |
-| POST   | `/api/smb/reset`            | Redefine todos os shares SMB  |
-| GET    | `/api/shares`               | Lista shares criados          |
+* O usuário sempre será `nasuser`
+* A senha é `NAS_SMB_PASSWORD` do `.env`
+
+### iPhone não conecta ao SMB
+
+* Isso é esperado sem VPN
+* Conecte via **WireGuard**
+* Acesse `smb://10.10.0.1`
+
+### Desempenho lento em USB
+
+* Use portas USB 3.0 / cabo adequado
+* Prefira formatos nativos (ext4, exfat)
 
 ---
 
-## **🛠 Logs e Debug**
+# 📄 Licença
 
-Logs do app:
+MIT
 
-```bash
-docker logs -f gvtnas
-```
-
-Logs do Samba:
-
-```bash
-docker exec -it gvtnas tail -f /var/log/samba/log.smbd
-```
-
-Ver discos dentro do container:
-
-```bash
-docker exec -it gvtnas lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
 ```
 
 ---
-
-* **Disco não aparece na interface**
-  Verifique se `/run/udev` está montado corretamente no container.
-
-* **Não acessa via SMB no iOS/macOS/Windows**
-  Usar:
-
-  ```
-  Usuário: nasuser
-  Senha:  <definida no NAS_SMB_PASSWORD>
-  ```
-
-* **Erro ao montar NTFS ou EXFAT**
-  Confirmar instalação dos drivers no host/kernel.
-
----
-
-## **📄 Licença**
-
-MIT ou outra à sua escolha.
-
----
+```
