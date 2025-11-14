@@ -1,62 +1,191 @@
+
+---
+
+# 📘 **README.md — GVTNas Disk Utility**
+
 ````md
 # GVTNas Disk Utility
 
-Painel web moderno inspirado no Disk Utility do macOS para administração de discos, volumes, partições, Time Machine, Clonezilla e compartilhamentos SMB — tudo isolado dentro de um container Docker.
+GVTNas é um painel web moderno inspirado no **Disk Utility do macOS**, criado para transformar qualquer servidor Linux em um NAS inteligente, bonito e fácil de usar.  
+Ele faz gerenciamento completo de:
 
-O GVTNas transforma qualquer servidor Linux em um NAS elegante e funcional, com UI moderna, hotplug USB, montagens seguras via `udisks2` e compartilhamento Samba totalmente automatizado.
+- Discos físicos  
+- Partições  
+- Montagens automáticas  
+- Time Machine  
+- Clonezilla  
+- SMB (Samba)  
+- Explorador de arquivos  
+- Hotplug USB  
+- Acesso remoto seguro via WireGuard  
 
----
-
-# 📦 Stack Tecnológica
-
-- **Backend:** Node.js 20 + Express + TypeScript  
-- **Frontend:** React + Vite + TailwindCSS  
-- **Sistema de arquivos:** `lsblk`, `udisksctl`, `mount/umount`, `blkid`  
-- **Serviços internos:** `smbd`, `udisks2`  
-- **Deploy:** Docker Compose (modo privileged)  
-
-Todo o gerenciamento (montagem, permissões, shares) ocorre **inteiramente dentro do container**, mantendo o host limpo.
-
----
-
-# ⚙️ Pré-requisitos
-
-- Linux com Docker + Docker Compose  
-- A pasta do projeto **deve estar** em:  
-  `/pendriver/GVTNas/`
-- Kernel com suporte aos filesystems desejados (ext4, exfat, ntfs, etc.)
-- Suporte a hotplug USB (normal em qualquer distro)
-- Roteador com IPv4 público ou DDNS
+Tudo rodando isolado dentro de containers Docker, sem mexer diretamente no seu sistema.
 
 ---
 
-# 🚀 Subindo a aplicação
-
-## 1. Clonar o repositório
+# 🔥 **TL;DR — Subir o GVTNas em 5 passos**
 
 ```bash
-git clone https://github.com/SEU_USUARIO/GVTNasDiskUtility.git
+# 1. Clonar o projeto
+git clone https://github.com/guianayans/GVTNasDiskUtility.git
 cd GVTNasDiskUtility
+
+# 2. Copiar .env
+cp .env.example .env
+nano .env   # definir APP_PASSWORD e NAS_SMB_PASSWORD
+
+# 3. Subir a aplicação
+docker compose up -d
+
+# 4. Acessar o painel
+http://SEU_IP:3010
+
+# 5. Login do painel
+Senha = APP_PASSWORD
 ````
 
-## 2. Criar o arquivo `.env`
+Para acesso remoto seguro (fora da sua rede), instale o WireGuard com o compose incluso neste README.
+
+---
+
+# 🧱 **Instalação completa do zero (para iniciantes)**
+
+Essa é a rota oficial e mais simples para instalar o GVTNas em qualquer servidor.
+
+---
+
+## **1. Instalar Ubuntu Server LTS**
+
+Baixe e instale:
+
+[https://ubuntu.com/download/server](https://ubuntu.com/download/server)
+
+Versões recomendadas: **22.04 LTS ou 24.04 LTS**
+
+Durante a instalação:
+
+* Nome do servidor: `linux-server`
+* Usuário: `seuusuario`
+* Habilite SSH (opcional, mas recomendado)
+
+---
+
+## **2. Instalar Docker + Docker Compose**
+
+```bash
+sudo apt update
+curl -fsSL https://get.docker.com | bash
+sudo usermod -aG docker $USER
+```
+
+Logout e login novamente.
+
+Verifique:
+
+```bash
+docker --version
+docker compose version
+```
+
+---
+
+## **3. Instalar Coolify (opcional, mas recomendado)**
+
+Coolify é um painel que facilita deploys:
+
+```bash
+docker run -d \
+  --name coolify \
+  --pull always \
+  -p 3000:3000 \
+  -v coolify:/data \
+  ghcr.io/coollabsio/coolify:latest
+```
+
+Acesse:
+
+```
+http://SEU_IP:3000
+```
+
+Configure e faça login.
+
+---
+
+## **4. Configurar DDNS com NO-IP**
+
+Se sua operadora te dá IP dinâmico, use DDNS.
+
+```bash
+sudo apt install noip2 -y
+sudo noip2 -C
+sudo systemctl enable noip2 --now
+```
+
+Crie seu hostname antes:
+[https://www.noip.com](https://www.noip.com)
+
+---
+
+## **5. Abrir portas no roteador**
+
+Acesse seu modem/roteador e adicione:
+
+| Finalidade    | Porta | Protocolo | Para IP interno |
+| ------------- | ----- | --------- | --------------- |
+| GVTNas painel | 3010  | TCP       | IP do servidor  |
+| WireGuard VPN | 51820 | UDP       | IP do servidor  |
+
+⚠️ **NUNCA abra portas SMB (445/139) na internet.
+SMB só funciona e só deve ser usado via WireGuard.**
+
+---
+
+# 📦 **Deploy do GVTNas (padrão oficial)**
+
+O projeto deve estar localizado exatamente em:
+
+```
+/pendriver/GVTNas
+```
+
+Crie o diretório:
+
+```bash
+sudo mkdir -p /pendriver/GVTNas
+sudo chown -R $USER:$USER /pendriver/GVTNas
+```
+
+---
+
+## **1. Clonar o repositório**
+
+```bash
+cd /pendriver/GVTNas
+git clone https://github.com/guianayans/GVTNasDiskUtility.git .
+```
+
+---
+
+## **2. Configurar o .env**
 
 ```bash
 cp .env.example .env
+nano .env
 ```
 
-Preencha pelo menos:
+Campos principais:
 
 ```env
-APP_PASSWORD=senha-do-painel
-NAS_SMB_PASSWORD=senha-do-samba
-PUBLIC_SMB_HOST=seu-dominio-ddns
-PUBLIC_BASE_URL=http://seu-ip-ou-dominio:3010
-NAS_SMB_USER=nasuser
-NAS_SMB_GROUP=nasuser
+APP_PASSWORD=senha_para_login_do_painel
+NAS_SMB_PASSWORD=senha_do_samba
+PUBLIC_SMB_HOST=seu_dominio_ddns
+PUBLIC_BASE_URL=http://seu_dominio_ou_ip:3010
 ```
 
-## 3. Subir com Docker Compose
+---
+
+## **3. Subir o container**
 
 ```bash
 docker compose up -d
@@ -68,81 +197,55 @@ Acesse:
 http://SEU_IP:3010
 ```
 
+### 🔑 **Login do painel**
+
+* Usuário: *(não existe usuário, somente senha)*
+* Senha: valor de `APP_PASSWORD`
+
 ---
 
-# 📑 Docker Compose Oficial
+# 🗂️ Recursos do GVTNas
 
-```yaml
-services:
-  gvtnas:
-    image: 'node:20'
-    container_name: gvtnas
-    working_dir: /app
-    privileged: true
-    volumes:
-      - '/pendriver/GVTNas:/app'
-      - '/run/udev:/run/udev'
-      - '/mnt:/mnt'
-      - '/media:/media'
-      - '/var/lib/gvtnas-samba:/var/lib/samba'
-      - '/etc/gvtnas-samba:/etc/samba'
-    ports:
-      - '3010:3010'
-      - '445:445'
-      - '139:139'
-    environment:
-      APP_PASSWORD: ${APP_PASSWORD}
-      VITE_APP_PASSWORD: ${APP_PASSWORD}
-      NODE_ENV: production
-      HOST: 0.0.0.0
-      PORT: 3010
-      SAMBA_CONFIG_PATH: /etc/samba/smb.conf
-      PUBLIC_SMB_HOST: ${PUBLIC_SMB_HOST}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3010}
-      NAS_SMB_PASSWORD: ${NAS_SMB_PASSWORD}
-      NAS_SMB_USER: ${NAS_SMB_USER:-nasuser}
-      NAS_SMB_GROUP: ${NAS_SMB_GROUP:-nasuser}
-    command: >
-      bash -c '
-        set -e
-        apt-get update
-        DEBIAN_FRONTEND=noninteractive apt-get install -y samba samba-common-bin udisks2 ntfs-3g exfatprogs
-        useradd -M -s /usr/sbin/nologin ${NAS_SMB_USER:-nasuser} >/dev/null 2>&1 || true
-        service smbd start
-        PASS=${NAS_SMB_PASSWORD}
-        if ! pdbedit -L | grep -q "^${NAS_SMB_USER:-nasuser}:"; then
-          printf "%s\n%s\n" "$$PASS" "$$PASS" | smbpasswd -a -s ${NAS_SMB_USER:-nasuser}
-        else
-          printf "%s\n%s\n" "$$PASS" "$$PASS" | smbpasswd -s ${NAS_SMB_USER:-nasuser}
-        fi
-        npm_config_production=false npm ci --no-audit --no-fund
-        npm run build --if-present
-        npm start
-      '
-    restart: unless-stopped
+### ✓ Árvore de discos igual ao macOS
+
+### ✓ Montagem e desmontagem com 1 clique
+
+### ✓ Explorador de arquivos moderno
+
+### ✓ Compartilhamentos SMB automáticos
+
+### ✓ Configuração para Time Machine
+
+### ✓ Compartilhamento Clonezilla
+
+### ✓ Logs ao vivo
+
+### ✓ Hotplug USB e detecção automática
+
+### ✓ UI glassy/glammorphism estilo Apple
+
+---
+
+# 🔧 **Deploy do WireGuard para acesso remoto (recomendado)**
+
+A pasta oficial para WireGuard é:
+
+```
+/pendriver/wireguard
 ```
 
----
-
-# 🌐 Acesso Remoto Seguro (WireGuard VPN)
-
-O acesso SMB pela internet **NÃO funciona de forma segura** e muitos ISPs bloqueiam portas 445/139.
-Para acesso externo 100% funcional (iOS, macOS, Windows), use **WireGuard**.
-
-O servidor passa a ser acessado como se você estivesse na mesma rede local.
-
----
-
-# 🔐 Instalando o WireGuard (Docker + Coolify)
-
-## 1. Criar pasta de configuração:
+Crie:
 
 ```bash
 sudo mkdir -p /pendriver/wireguard/config
 sudo chmod -R 777 /pendriver/wireguard
 ```
 
-## 2. Criar novo app Docker no Coolify e colar:
+---
+
+## **1. docker-compose.yml do WireGuard**
+
+Crie um app no Coolify ou arquivo `docker-compose.yml`:
 
 ```yaml
 services:
@@ -171,23 +274,37 @@ services:
     restart: unless-stopped
 ```
 
-## 3. Deployar
+---
 
-Serão criados arquivos como:
+## **2. Subir**
+
+```bash
+docker compose up -d
+```
+
+Isso vai gerar pastas como:
 
 ```
 /pendriver/wireguard/config/peer_iphone/peer_iphone.png
 ```
 
-Escaneie esse QR Code no app **WireGuard** (iOS/Android).
+---
+
+## **3. Conectar no iPhone (ou qualquer dispositivo)**
+
+No app WireGuard:
+
+* “Adicionar túnel”
+* “Criar *a partir do QR Code*”
+* Escaneie `peer_iphone.png`
+
+Pronto. Agora sua VPN está ativa.
 
 ---
 
-# 📡 Acesso Remoto ao GVTNas via VPN
+# 🌐 **Acesso remoto ao GVTNas via WireGuard**
 
-Depois de conectado à VPN, acesse:
-
-### Interface Web:
+### Painel:
 
 ```
 http://10.10.0.1:3010
@@ -199,98 +316,65 @@ http://10.10.0.1:3010
 smb://10.10.0.1
 ```
 
-Total compatibilidade com:
+### Funções liberadas via VPN:
 
-* iPhone (app Arquivos)
-* macOS Finder
-* Windows Explorer
+* Acesso a discos
+* SMB
+* Time Machine
+* File Explorer
+* Interface do GVTNas
+* Apps adicionais no servidor
 
----
-
-# 🌍 Configuração de DDNS (NO-IP)
-
-1. Crie conta em: [https://www.noip.com](https://www.noip.com)
-2. Crie um hostname (ex.: `seuservidor.ddns.net`)
-3. Instale o cliente NO-IP no servidor:
-
-```bash
-sudo apt install noip2 -y
-sudo noip2 -C
-```
-
-4. Verifique:
-
-```bash
-sudo systemctl status noip2
-```
+Sem expor nada para a internet.
 
 ---
 
-# 🔧 Port Forwarding Necessário
+# 🔒 **Credenciais internas**
 
-No roteador, abra:
+## Painel Web
 
-| Serviço       | Porta | Protocolo | Para                 |
-| ------------- | ----- | --------- | -------------------- |
-| **GVTNas**    | 3010  | TCP       | IP local do servidor |
-| **WireGuard** | 51820 | UDP       | IP local do servidor |
+* usuário: *(não existe)*
+* senha: `APP_PASSWORD`
 
-**NÃO abra portas 445 ou 139** na internet.
-SMB só deve ser usado via WireGuard (segurança + funcionamento garantido).
+## SMB
 
----
-
-# 📁 Recursos do GVTNas
-
-### ✓ Árvore completa de discos/partições
-
-### ✓ Montagem automática de volumes
-
-### ✓ Explorador de arquivos em `/mnt` e `/media`
-
-### ✓ Hotplug USB monitorado
-
-### ✓ Compartilhamentos SMB automáticos
-
-### ✓ Perfis de Time Machine / Clonezilla
-
-### ✓ Mapeamento de usuários interno
-
-### ✓ Logs detalhados
-
-### ✓ API REST completa
+* usuário: `NAS_SMB_USER` (padrão: nasuser)
+* senha: `NAS_SMB_PASSWORD`
 
 ---
 
-# 🛠 Troubleshooting
+# 🧰 Troubleshooting
 
 ### Disco não aparece
 
 * Verifique se `/run/udev` está montado no container
-
-### Samba não autentica
-
-* O usuário sempre será `nasuser`
-* A senha é `NAS_SMB_PASSWORD` do `.env`
+* USB 3.0 funciona melhor
 
 ### iPhone não conecta ao SMB
 
-* Isso é esperado sem VPN
-* Conecte via **WireGuard**
-* Acesse `smb://10.10.0.1`
+* Use WireGuard (obrigatório para acesso remoto)
 
-### Desempenho lento em USB
+### Painel não sobe
 
-* Use portas USB 3.0 / cabo adequado
-* Prefira formatos nativos (ext4, exfat)
+```bash
+docker compose logs -f gvtnas
+```
+
+### Mudar senha SMB
+
+```bash
+docker exec -it gvtnas smbpasswd nasuser
+```
 
 ---
 
-# 📄 Licença
+# 📜 Licença
 
 MIT
 
-```
-
 ---
-```
+
+# ✨ Criado por Gui Anayans
+
+Open-source, moderno e acessível.
+Sinta-se livre para abrir issues, contribuir ou sugerir melhorias.
