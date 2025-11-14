@@ -1,6 +1,3 @@
-
----
-
 # 📘 **README.md — GVTNas Disk Utility**
 
 ````md
