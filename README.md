@@ -162,6 +162,26 @@ cd /pendriver/GVTNas
 git clone https://github.com/guianayans/GVTNasDiskUtility.git .
 ```
 
+> ### Nota sobre Deploy via **Docker Compose (Empty)** no Coolify
+> 
+> Se você realizar o deploy do GVTNas utilizando a opção **Docker Compose (Empty)** no Coolify, **não é necessário criar ou editar o arquivo `.env` no servidor**.  
+> 
+> Todas as variáveis de ambiente utilizadas pelo container devem ser definidas diretamente no painel do Coolify, em:
+> 
+> **Application → Environment Variables**  
+> 
+> O Coolify injeta automaticamente essas variáveis no container durante o processo de build e execução, substituindo completamente a necessidade de um arquivo `.env` local.  
+> 
+> Certifique-se apenas de preencher corretamente:
+> - `APP_PASSWORD`
+> - `NAS_SMB_PASSWORD`
+> - `PUBLIC_SMB_HOST`
+- `PUBLIC_BASE_URL`
+> - `NAS_SMB_USER` (opcional, padrão: `nasuser`)
+> - `NAS_SMB_GROUP` (opcional, padrão: `nasuser`)
+> 
+> Com isso, o deploy acontecerá normalmente sem qualquer arquivo `.env` no repositório.
+
 ---
 
 ## **2. Configurar o .env**
