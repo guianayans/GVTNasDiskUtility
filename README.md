@@ -1,11 +1,3 @@
-Segue um **README.md totalmente revisado**, claro, profissional e com a nova sessão completa sobre **WireGuard + acesso remoto seguro**, além de instruções de **DDNS (NO-IP)**, **port forwarding**, **roteadores comuns**, e tudo que alguém precisa para instalar o GVTNas em qualquer servidor e usar remotamente sem quebrar nada.
-
-Está no tom certo para documentação pública, sem expor nada sensível, e mantendo o app elegante.
-
----
-
-# ✔️ **README.md atualizado (versão final)**
-
 ````md
 # GVTNas Disk Utility
 
