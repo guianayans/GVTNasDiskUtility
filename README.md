@@ -11,7 +11,7 @@ Ele oferece:
 - Montagem automática via udisks2  
 - Explorador de arquivos integrado  
 - Compartilhamentos SMB  
-- Time Machine / Clonezilla  
+- Time Machine / Clonezilla (Função Desativada - Ativar via Código)
 - Hotplug USB  
 - Configuração de usuários  
 - Acesso local e remoto via WireGuard  
