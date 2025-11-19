@@ -128,7 +128,7 @@ export default function Sidebar({ internal, external, selectedId, onSelect, filt
   return (
     <aside className="glass-card w-80 max-w-full p-4 flex flex-col gap-6 overflow-y-auto scroll-hidden">
       <div className="flex items-center justify-between text-xs text-slate-400">
-        <span>Discos do sistema (&lt;2GB)</span>
+        <span>Discos do sistema (&lt;3GB)</span>
         <button
           type="button"
           onClick={() => setShowSystemDisks((prev) => !prev)}
