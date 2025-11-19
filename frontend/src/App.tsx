@@ -7,9 +7,11 @@ import Toast from './components/Toast';
 import AppHeader from './components/AppHeader';
 import { DiskNode, DiskResponse, FsEntry } from './types';
 import { config } from './config';
+import InstructionsOverlay from './components/InstructionsOverlay';
 
 const apiUrl = (path: string) => `${config.apiBaseUrl}${path}`;
 const authKey = config.appPassword ? `nas-auth-${config.appPassword}` : 'nas-auth';
+const instructionsKey = `${authKey}-instructions`;
 
 interface ToastState {
   message: string;
@@ -27,6 +29,8 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = useCallback((message: string, type: ToastState['type'] = 'info') => {
@@ -43,14 +47,14 @@ export default function App() {
     const saved = localStorage.getItem(authKey) === '1';
     setAuthenticated(saved);
     setAuthReady(true);
-  }, []);
+  }, [authKey]);
 
   useEffect(() => {
-    document.body.style.overflow = !authenticated || showExplorer ? 'hidden' : '';
+    document.body.style.overflow = !authenticated || showExplorer || showInstructions ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
-  }, [authenticated, showExplorer]);
+  }, [authenticated, showExplorer, showInstructions]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -131,7 +135,7 @@ export default function App() {
     async (path: string) => {
       setFsLoading(true);
       try {
-      const response = await fetch(apiUrl(`/api/fs/list?path=${encodeURIComponent(path)}`));
+        const response = await fetch(apiUrl(`/api/fs/list?path=${encodeURIComponent(path)}`));
         if (!response.ok) throw new Error('Erro ao carregar diretório');
         const payload = await response.json();
         setFsEntries(payload.entries);
@@ -144,6 +148,31 @@ export default function App() {
       }
     },
     [showToast]
+  );
+
+  const handleDeleteEntry = useCallback(
+    async (entry: FsEntry) => {
+      const confirmMessage = entry.isDirectory
+        ? `Deseja excluir a pasta "${entry.name}" e todo o conteúdo?`
+        : `Deseja excluir o arquivo "${entry.name}"?`;
+      if (!window.confirm(confirmMessage)) return;
+      try {
+        const response = await fetch(apiUrl('/api/fs/delete'), {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: entry.path }),
+        });
+        if (!response.ok) throw new Error('Falha ao remover');
+        showToast('Remoção concluída', 'success');
+        if (fsPath) {
+          await loadDirectory(fsPath);
+        }
+      } catch (error) {
+        console.error(error);
+        showToast('Não foi possível remover o item', 'error');
+      }
+    },
+    [fsPath, loadDirectory, showToast]
   );
 
   const openExplorer = async (disk: DiskNode) => {
@@ -190,6 +219,43 @@ export default function App() {
     }
   };
 
+  const handleUpload = useCallback(
+    async (files: FileList | File[], target: string) => {
+      if (!files || !target) return;
+      const list = Array.from(files);
+      if (!list.length) return;
+      const formData = new FormData();
+      formData.append('targetPath', target);
+      list.forEach((file) => formData.append('files', file));
+      setUploading(true);
+      try {
+        const response = await fetch(apiUrl('/api/fs/upload'), {
+          method: 'POST',
+          body: formData,
+        });
+        if (!response.ok) throw new Error('Falha no upload');
+        showToast('Upload concluído', 'success');
+        await loadDirectory(target);
+      } catch (error) {
+        console.error(error);
+        showToast('Não foi possível enviar os arquivos', 'error');
+      } finally {
+        setUploading(false);
+      }
+    },
+    [loadDirectory, showToast]
+  );
+
+  const handleUnlock = useCallback(() => {
+    const alreadyUnlocked = localStorage.getItem(authKey) === '1';
+    localStorage.setItem(authKey, '1');
+    setAuthenticated(true);
+    if (!alreadyUnlocked) {
+      setShowInstructions(true);
+      localStorage.setItem(instructionsKey, '1');
+    }
+  }, [authKey, instructionsKey]);
+
   return (
     <div className="min-h-screen text-white">
       <div className="max-w-6xl mx-auto py-6 space-y-6">
@@ -208,6 +274,7 @@ export default function App() {
               showToast('Não foi possível redefinir os SMBs', 'error');
             }
           }}
+          onShowInstructions={() => setShowInstructions(true)}
         />
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           <Sidebar
@@ -235,14 +302,17 @@ export default function App() {
         loading={fsLoading}
         onNavigate={loadDirectory}
         onClose={() => setShowExplorer(false)}
+        onDelete={handleDeleteEntry}
+        onUpload={(files) => {
+          if (fsPath) void handleUpload(files, fsPath);
+        }}
+        uploading={uploading}
       />
       <AuthOverlay
         open={authReady && !authenticated}
-        onUnlock={() => {
-          localStorage.setItem(authKey, '1');
-          setAuthenticated(true);
-        }}
+        onUnlock={handleUnlock}
       />
+      <InstructionsOverlay open={showInstructions} onClose={() => setShowInstructions(false)} />
       {toast && <Toast message={toast.message} type={toast.type} />}
     </div>
   );

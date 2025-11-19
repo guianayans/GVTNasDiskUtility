@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { FsEntry } from '../types';
 import { buildBreadcrumb, formatBytes, formatDate } from '../utils';
 
@@ -8,13 +9,55 @@ interface ExplorerOverlayProps {
   loading: boolean;
   onNavigate: (path: string) => void;
   onClose: () => void;
+  onDelete: (entry: FsEntry) => void;
+  onUpload: (files: FileList | File[]) => void;
+  uploading: boolean;
 }
 
-export default function ExplorerOverlay({ open, path, entries, loading, onNavigate, onClose }: ExplorerOverlayProps) {
+export default function ExplorerOverlay({
+  open,
+  path,
+  entries,
+  loading,
+  onNavigate,
+  onClose,
+  onDelete,
+  onUpload,
+  uploading,
+}: ExplorerOverlayProps) {
   if (!open || !path) return null;
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragActive, setDragActive] = useState(false);
   const crumbs = buildBreadcrumb(path);
   const parent = getParentPath(path);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files?.length) {
+      onUpload(event.target.files);
+      event.target.value = '';
+    }
+  };
+
+  const onDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragActive(true);
+  };
+
+  const onDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (event.currentTarget === event.target) {
+      setDragActive(false);
+    }
+  };
+
+  const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+    if (event.dataTransfer.files?.length) {
+      onUpload(event.dataTransfer.files);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center px-6">
@@ -36,7 +79,7 @@ export default function ExplorerOverlay({ open, path, entries, loading, onNaviga
             Fechar
           </button>
         </header>
-        <div className="p-4 flex items-center gap-3 text-sm text-slate-400 border-b border-white/5">
+        <div className="p-4 flex flex-wrap items-center gap-3 text-sm text-slate-400 border-b border-white/5">
           <button
             type="button"
             className="glass-muted-btn disabled:opacity-40"
@@ -46,8 +89,21 @@ export default function ExplorerOverlay({ open, path, entries, loading, onNaviga
             ← Voltar
           </button>
           <span className="text-xs text-slate-500">{path}</span>
+          <div className="flex-1" />
+          <input ref={fileInputRef} type="file" className="hidden" multiple onChange={handleFileChange} />
+          <button type="button" className="glass-btn text-sm" onClick={() => fileInputRef.current?.click()}>
+            Enviar arquivos
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto scroll-hidden">
+        <div
+          className={`flex-1 overflow-y-auto scroll-hidden transition border-t border-white/5 ${
+            dragActive ? 'ring-2 ring-cyan-300/60 border-dashed border-cyan-200/40' : ''
+          }`}
+          onDragOver={onDragOver}
+          onDragEnter={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+        >
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-slate-900/90">
               <tr className="text-left text-xs uppercase text-slate-500">
@@ -58,6 +114,13 @@ export default function ExplorerOverlay({ open, path, entries, loading, onNaviga
               </tr>
             </thead>
             <tbody>
+              {uploading && (
+                <tr>
+                  <td colSpan={4} className="py-4 text-center text-cyan-200">
+                    Enviando arquivos...
+                  </td>
+                </tr>
+              )}
               {loading && (
                 <tr>
                   <td colSpan={4} className="py-6 text-center text-slate-400">
@@ -87,14 +150,30 @@ export default function ExplorerOverlay({ open, path, entries, loading, onNaviga
                     <td className="px-4">{entry.isDirectory ? '—' : formatBytes(entry.size)}</td>
                     <td className="px-4">{formatDate(entry.modified)}</td>
                     <td className="px-4">
-                      {!entry.isDirectory && (
-                        <a
-                          className="text-xs text-cyan-200 hover:text-cyan-100"
-                          href={`/api/fs/download?path=${encodeURIComponent(entry.path)}`}
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        {entry.isDirectory ? (
+                          <a
+                            className="text-cyan-200 hover:text-cyan-100"
+                            href={`/api/fs/download-zip?path=${encodeURIComponent(entry.path)}`}
+                          >
+                            Baixar .zip
+                          </a>
+                        ) : (
+                          <a
+                            className="text-cyan-200 hover:text-cyan-100"
+                            href={`/api/fs/download?path=${encodeURIComponent(entry.path)}`}
+                          >
+                            Download
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          className="text-rose-300 hover:text-rose-200"
+                          onClick={() => onDelete(entry)}
                         >
-                          Download
-                        </a>
-                      )}
+                          Excluir
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

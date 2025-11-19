@@ -24,4 +24,5 @@ export const env = {
     .split(',')
     .map((root) => root.trim())
     .filter(Boolean),
+  wireguardConfigPath: process.env.WIREGUARD_CONFIG_PATH ?? '/wg-config',
 };

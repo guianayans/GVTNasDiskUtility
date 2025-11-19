@@ -5,6 +5,8 @@ import morgan from 'morgan';
 import diskRoutes from './routes/diskRoutes';
 import fsRoutes from './routes/fsRoutes';
 import sambaRoutes from './routes/sambaRoutes';
+import systemRoutes from './routes/systemRoutes';
+import wireguardRoutes from './routes/wireguardRoutes';
 import { resetAllShares } from './services/sambaService';
 import { env } from './config/env';
 
@@ -19,6 +21,8 @@ app.use(morgan('dev'));
 app.use('/api', diskRoutes);
 app.use('/api', fsRoutes);
 app.use('/api', sambaRoutes);
+app.use('/api', systemRoutes);
+app.use('/api', wireguardRoutes);
 
 const frontendDir = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
 app.use(express.static(frontendDir));

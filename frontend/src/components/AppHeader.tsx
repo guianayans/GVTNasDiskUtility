@@ -5,9 +5,10 @@ interface AppHeaderProps {
   onSearch?: (term: string) => void;
   searchRef?: RefObject<HTMLInputElement>;
   onResetShares?: () => void;
+  onShowInstructions?: () => void;
 }
 
-export default function AppHeader({ onSearch, searchRef, onResetShares }: AppHeaderProps) {
+export default function AppHeader({ onSearch, searchRef, onResetShares, onShowInstructions }: AppHeaderProps) {
   const handleSearch = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       onSearch?.(event.target.value);
@@ -35,13 +36,14 @@ export default function AppHeader({ onSearch, searchRef, onResetShares }: AppHea
             id="global-search"
           />
         </div>
-        <button
-          type="button"
-          className="glass-muted-btn text-sm"
-          onClick={onResetShares}
-        >
-          Redefinir SMB
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" className="glass-muted-btn text-sm" onClick={onShowInstructions}>
+            Instruções de conexão
+          </button>
+          <button type="button" className="glass-muted-btn text-sm" onClick={onResetShares}>
+            Redefinir SMB
+          </button>
+        </div>
       </div>
     </header>
   );

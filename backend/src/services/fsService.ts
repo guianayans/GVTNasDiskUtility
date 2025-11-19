@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import type { Dirent } from 'fs';
+import archiver from 'archiver';
 import { resolveSafePath } from '../utils/pathUtils';
 
 export interface FsEntry {
@@ -44,4 +45,38 @@ export async function getFileForDownload(targetPath: string): Promise<{ path: st
     throw new Error('Requested path is not a file');
   }
   return { path: safePath, name: path.basename(safePath) };
+}
+
+export async function removeEntry(targetPath: string): Promise<void> {
+  const safePath = resolveSafePath(targetPath);
+  await fs.remove(safePath);
+}
+
+export async function createZipArchive(targetPath: string) {
+  const safePath = resolveSafePath(targetPath);
+  const stats = await fs.stat(safePath);
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  const baseName = path.basename(safePath) || 'arquivos';
+
+  if (stats.isDirectory()) {
+    archive.directory(safePath, false);
+  } else {
+    archive.file(safePath, { name: baseName });
+  }
+
+  return { archive, archiveName: `${baseName}.zip` };
+}
+
+export async function saveUploadedFiles(targetDir: string, files: Array<{ originalname: string; buffer: Buffer }>) {
+  const safeDir = resolveSafePath(targetDir);
+  const stats = await fs.stat(safeDir);
+  if (!stats.isDirectory()) {
+    throw new Error('Target path must be a directory');
+  }
+  await Promise.all(
+    files.map(async (file) => {
+      const dest = path.join(safeDir, file.originalname);
+      await fs.writeFile(dest, file.buffer);
+    })
+  );
 }

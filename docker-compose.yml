@@ -11,6 +11,7 @@ services:
       - '/media:/media'
       - '/var/lib/gvtnas-samba:/var/lib/samba'
       - '/etc/gvtnas-samba:/etc/samba'
+      - '/pendriver/GVTNas/wireguard/config:/wg-config:ro'
     ports:
       - '3010:3010'
       - '445:445'
@@ -44,4 +45,28 @@ services:
         npm run build --if-present
         npm start
       '
+    restart: unless-stopped
+
+  wireguard:
+    image: linuxserver/wireguard
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      PUID: ${PUID:-0}
+      PGID: ${PGID:-0}
+      TZ: ${TZ:-America/Sao_Paulo}
+      SERVERURL: ${SERVERURL}
+      SERVERPORT: ${SERVERPORT:-51820}
+      PEERS: ${PEERS:-iphone,macbook,windows}
+      PEERDNS: ${PEERDNS:-1.1.1.1}
+      INTERNAL_SUBNET: ${INTERNAL_SUBNET:-10.10.0.0/24}
+    volumes:
+      - '/pendriver/GVTNas/wireguard/config:/config'
+      - '/lib/modules:/lib/modules'
+    ports:
+      - '51820:51820/udp'
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
     restart: unless-stopped
