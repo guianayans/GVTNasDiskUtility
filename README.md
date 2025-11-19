@@ -2,7 +2,10 @@
 
 ````md
 
-O **GVTNas Disk Utility** transforma qualquer servidor Linux em um **NAS moderno**, inspirado no Disk Utility do macOS, com interface glassy, navegação limpa, gerenciamento completo de discos e compartilhamentos SMB, além de integração pronta com VPN WireGuard para acesso remoto 100% seguro.
+O **GVTNas Disk Utility** transforma qualquer servidor Linux em um **NAS moderno**,
+inspirado no Disk Utility do macOS, com interface glassy, navegação limpa, gerenciamento
+completo de discos e compartilhamentos SMB, 
+além de integração pronta com VPN WireGuard para acesso remoto 100% seguro.
 
 Ele oferece:
 
