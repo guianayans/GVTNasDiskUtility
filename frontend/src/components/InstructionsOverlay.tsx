@@ -98,7 +98,7 @@ export default function InstructionsOverlay({ open, onClose }: InstructionsOverl
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Guia rápido</p>
             <h2 className="text-2xl font-semibold text-white">Instruções de conexão</h2>
-            <p className="text-slate-400">A senha do painel é a mesma que você configurou ao iniciar o LiveOS.</p>
+            <p className="text-slate-400">A senha do painel é a mesma que você configurou nas variáveis de ambiente.</p>
           </div>
           <button type="button" className="glass-btn" onClick={onClose}>
             Fechar
