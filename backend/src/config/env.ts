@@ -11,6 +11,7 @@ export const env = {
   host: process.env.HOST ?? '0.0.0.0',
   port: numberFromEnv(process.env.PORT, 3010),
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? 'http://localhost:3010',
+  appPassword: process.env.APP_PASSWORD ?? '',
   sambaConfigPath: process.env.SAMBA_CONFIG_PATH ?? '/etc/samba/smb.conf',
   publicSmbHost: process.env.PUBLIC_SMB_HOST ?? 'localhost',
   nasSmbUser: process.env.NAS_SMB_USER ?? 'nasuser',

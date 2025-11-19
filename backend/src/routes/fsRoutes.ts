@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { createZipArchive, getFileForDownload, listDirectory, removeEntry, saveUploadedFiles } from '../services/fsService';
+import { requireOpsToken } from '../middleware/requireOpsToken';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -19,7 +20,7 @@ router.get('/fs/list', async (req, res, next) => {
   }
 });
 
-router.get('/fs/download', async (req, res, next) => {
+router.get('/fs/download', requireOpsToken, async (req, res, next) => {
   try {
     const targetPath = req.query.path as string;
     if (!targetPath) {
@@ -33,7 +34,7 @@ router.get('/fs/download', async (req, res, next) => {
   }
 });
 
-router.get('/fs/download-zip', async (req, res, next) => {
+router.get('/fs/download-zip', requireOpsToken, async (req, res, next) => {
   try {
     const targetPath = req.query.path as string;
     if (!targetPath) {
@@ -67,7 +68,7 @@ router.delete('/fs/delete', async (req, res, next) => {
   }
 });
 
-router.post('/fs/upload', upload.array('files'), async (req, res, next) => {
+router.post('/fs/upload', requireOpsToken, upload.array('files'), async (req, res, next) => {
   try {
     const targetPath = req.body?.targetPath as string;
     const files = req.files as Express.Multer.File[];

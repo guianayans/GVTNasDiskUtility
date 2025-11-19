@@ -5,6 +5,7 @@ import ExplorerOverlay from './components/ExplorerOverlay';
 import AuthOverlay from './components/AuthOverlay';
 import Toast from './components/Toast';
 import AppHeader from './components/AppHeader';
+import OpsUnlockModal from './components/OpsUnlockModal';
 import { DiskNode, DiskResponse, FsEntry } from './types';
 import { config } from './config';
 import InstructionsOverlay from './components/InstructionsOverlay';
@@ -12,6 +13,13 @@ import InstructionsOverlay from './components/InstructionsOverlay';
 const apiUrl = (path: string) => `${config.apiBaseUrl}${path}`;
 const authKey = config.appPassword ? `nas-auth-${config.appPassword}` : 'nas-auth';
 const instructionsKey = `${authKey}-instructions`;
+const OPS_STORAGE_KEY = 'gvtnas_ops_token';
+const OPS_TOKEN_INVALID = 'OPS_TOKEN_INVALID';
+
+interface OpsState {
+  token?: string;
+  expiresAt?: number;
+}
 
 interface ToastState {
   message: string;
@@ -31,7 +39,32 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showInstructions, setShowInstructions] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [opsState, setOpsState] = useState<OpsState>(() => {
+    if (typeof window === 'undefined') return {};
+    const raw = window.localStorage.getItem(OPS_STORAGE_KEY);
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw) as OpsState;
+      if (parsed.expiresAt && parsed.expiresAt > Date.now() && parsed.token) {
+        return parsed;
+      }
+      window.localStorage.removeItem(OPS_STORAGE_KEY);
+      return {};
+    } catch {
+      window.localStorage.removeItem(OPS_STORAGE_KEY);
+      return {};
+    }
+  });
+  const [opsModalOpen, setOpsModalOpen] = useState(false);
+  const [opsModalLoading, setOpsModalLoading] = useState(false);
+  const [opsModalError, setOpsModalError] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const pendingOpsResolvers = useRef<Array<(token: string) => void>>([]);
+  const pendingOpsRejectors = useRef<Array<(reason?: Error) => void>>([]);
+  const hasValidOpsToken = useMemo(
+    () => Boolean(opsState.token && opsState.expiresAt && opsState.expiresAt > Date.now()),
+    [opsState]
+  );
 
   const showToast = useCallback((message: string, type: ToastState['type'] = 'info') => {
     setToast({ message, type });
@@ -66,6 +99,108 @@ export default function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  const saveOpsToken = useCallback((token: string, expiresAt: number) => {
+    const payload: OpsState = { token, expiresAt };
+    setOpsState(payload);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(payload));
+    }
+  }, []);
+
+  const clearOpsToken = useCallback(() => {
+    setOpsState({});
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(OPS_STORAGE_KEY);
+    }
+  }, []);
+
+  const fulfillOpsRequests = useCallback((token: string) => {
+    pendingOpsResolvers.current.forEach((resolve) => resolve(token));
+    pendingOpsResolvers.current = [];
+    pendingOpsRejectors.current = [];
+  }, []);
+
+  const rejectOpsRequests = useCallback((error?: Error) => {
+    pendingOpsRejectors.current.forEach((reject) => reject(error));
+    pendingOpsResolvers.current = [];
+    pendingOpsRejectors.current = [];
+  }, []);
+
+  const ensureOpsToken = useCallback(() => {
+    if (hasValidOpsToken && opsState.token) {
+      return Promise.resolve(opsState.token);
+    }
+    return new Promise<string>((resolve, reject) => {
+      pendingOpsResolvers.current.push(resolve);
+      pendingOpsRejectors.current.push(reject);
+      setOpsModalOpen(true);
+    });
+  }, [hasValidOpsToken, opsState.token]);
+
+  const submitOpsPassword = useCallback(
+    async (password: string) => {
+      setOpsModalLoading(true);
+      setOpsModalError('');
+      try {
+        const response = await fetch(apiUrl('/api/ops-auth'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          setOpsModalError(payload?.error || 'Falha ao validar senha.');
+          return;
+        }
+        const payload = await response.json();
+        saveOpsToken(payload.token, payload.expiresAt);
+        setOpsModalOpen(false);
+        setOpsModalError('');
+        fulfillOpsRequests(payload.token);
+      } catch (error) {
+        console.error(error);
+        setOpsModalError('Não foi possível validar a senha.');
+      } finally {
+        setOpsModalLoading(false);
+      }
+    },
+    [fulfillOpsRequests, saveOpsToken]
+  );
+
+  const handleOpsModalClose = useCallback(() => {
+    setOpsModalOpen(false);
+    setOpsModalError('');
+    rejectOpsRequests(new Error('cancelled'));
+  }, [rejectOpsRequests]);
+
+  const withOpsToken = useCallback(
+    async (action: (token: string) => Promise<void>) => {
+      const attempt = async (): Promise<void> => {
+        const token = await ensureOpsToken();
+        try {
+          await action(token);
+        } catch (error: any) {
+          if (error?.code === OPS_TOKEN_INVALID) {
+            clearOpsToken();
+            throw error;
+          }
+          throw error;
+        }
+      };
+
+      try {
+        await attempt();
+      } catch (error: any) {
+        if (error?.code === OPS_TOKEN_INVALID) {
+          await attempt();
+        } else {
+          throw error;
+        }
+      }
+    },
+    [clearOpsToken, ensureOpsToken]
+  );
 
   const fetchDisks = useCallback(async () => {
     try {
@@ -182,6 +317,49 @@ export default function App() {
     setShowExplorer(true);
   };
 
+  const downloadBlob = useCallback((blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleDownloadEntry = useCallback(
+    async (entry: FsEntry) => {
+      try {
+        await withOpsToken(async (token) => {
+          const endpoint = entry.isDirectory
+            ? `/api/fs/download-zip?path=${encodeURIComponent(entry.path)}`
+            : `/api/fs/download?path=${encodeURIComponent(entry.path)}`;
+          const response = await fetch(apiUrl(endpoint), {
+            headers: { 'x-ops-token': token },
+          });
+          if (response.status === 401) {
+            const err = new Error('Token inválido');
+            (err as any).code = OPS_TOKEN_INVALID;
+            throw err;
+          }
+          if (!response.ok) throw new Error('Falha ao baixar');
+          const blob = await response.blob();
+          const filename = entry.isDirectory
+            ? `${entry.name || 'pasta'}.zip`
+            : entry.name || 'arquivo';
+          downloadBlob(blob, filename);
+        });
+      } catch (error: any) {
+        if (error?.code !== OPS_TOKEN_INVALID) {
+          console.error(error);
+          showToast('Não foi possível baixar o item.', 'error');
+        }
+      }
+    },
+    [downloadBlob, showToast, withOpsToken]
+  );
+
   useEffect(() => {
     const mountpoint = selectedDisk?.mountpoint;
     if (!mountpoint) {
@@ -229,21 +407,31 @@ export default function App() {
       list.forEach((file) => formData.append('files', file));
       setUploading(true);
       try {
-        const response = await fetch(apiUrl('/api/fs/upload'), {
-          method: 'POST',
-          body: formData,
+        await withOpsToken(async (token) => {
+          const response = await fetch(apiUrl('/api/fs/upload'), {
+            method: 'POST',
+            body: formData,
+            headers: { 'x-ops-token': token },
+          });
+          if (response.status === 401) {
+            const err = new Error('Token inválido');
+            (err as any).code = OPS_TOKEN_INVALID;
+            throw err;
+          }
+          if (!response.ok) throw new Error('Falha no upload');
         });
-        if (!response.ok) throw new Error('Falha no upload');
         showToast('Upload concluído', 'success');
         await loadDirectory(target);
-      } catch (error) {
-        console.error(error);
-        showToast('Não foi possível enviar os arquivos', 'error');
+      } catch (error: any) {
+        if (error?.code !== OPS_TOKEN_INVALID) {
+          console.error(error);
+          showToast('Não foi possível enviar os arquivos', 'error');
+        }
       } finally {
         setUploading(false);
       }
     },
-    [loadDirectory, showToast]
+    [loadDirectory, showToast, withOpsToken]
   );
 
   const handleUnlock = useCallback(() => {
@@ -307,10 +495,18 @@ export default function App() {
           if (fsPath) void handleUpload(files, fsPath);
         }}
         uploading={uploading}
+        onDownload={handleDownloadEntry}
       />
       <AuthOverlay
         open={authReady && !authenticated}
         onUnlock={handleUnlock}
+      />
+      <OpsUnlockModal
+        open={opsModalOpen}
+        loading={opsModalLoading}
+        error={opsModalError}
+        onSubmit={submitOpsPassword}
+        onClose={handleOpsModalClose}
       />
       <InstructionsOverlay open={showInstructions} onClose={() => setShowInstructions(false)} />
       {toast && <Toast message={toast.message} type={toast.type} />}

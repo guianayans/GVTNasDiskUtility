@@ -12,6 +12,7 @@ interface ExplorerOverlayProps {
   onDelete: (entry: FsEntry) => void;
   onUpload: (files: FileList | File[]) => void;
   uploading: boolean;
+  onDownload: (entry: FsEntry) => void;
 }
 
 export default function ExplorerOverlay({
@@ -24,6 +25,7 @@ export default function ExplorerOverlay({
   onDelete,
   onUpload,
   uploading,
+  onDownload,
 }: ExplorerOverlayProps) {
   if (!open || !path) return null;
 
@@ -151,21 +153,13 @@ export default function ExplorerOverlay({
                     <td className="px-4">{formatDate(entry.modified)}</td>
                     <td className="px-4">
                       <div className="flex flex-wrap gap-3 text-xs">
-                        {entry.isDirectory ? (
-                          <a
-                            className="text-cyan-200 hover:text-cyan-100"
-                            href={`/api/fs/download-zip?path=${encodeURIComponent(entry.path)}`}
-                          >
-                            Baixar .zip
-                          </a>
-                        ) : (
-                          <a
-                            className="text-cyan-200 hover:text-cyan-100"
-                            href={`/api/fs/download?path=${encodeURIComponent(entry.path)}`}
-                          >
-                            Download
-                          </a>
-                        )}
+                        <button
+                          type="button"
+                          className="text-cyan-200 hover:text-cyan-100"
+                          onClick={() => onDownload(entry)}
+                        >
+                          {entry.isDirectory ? 'Baixar .zip' : 'Download'}
+                        </button>
                         <button
                           type="button"
                           className="text-rose-300 hover:text-rose-200"
