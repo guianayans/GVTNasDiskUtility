@@ -6,6 +6,7 @@ services:
     privileged: true
     volumes:
       - '/pendriver/GVTNas:/app'
+      - '/dev:/dev'
       - '/run/udev:/run/udev'
       - '/mnt:/mnt'
       - '/media:/media'

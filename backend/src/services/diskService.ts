@@ -5,7 +5,7 @@ import { runCommand, tryCommand } from '../utils/command';
 import { ShareEntry, loadShareState } from './shareState';
 import { NAS_GROUP, NAS_USER, getNasUserIds } from './nasUserConfig';
 
-const LSBLK_COLUMNS = 'NAME,KNAME,TYPE,MOUNTPOINT,LABEL,UUID,FSTYPE,RM,HOTPLUG,SIZE,MODEL,ROTA';
+const LSBLK_COLUMNS = 'NAME,KNAME,PATH,TYPE,MOUNTPOINT,LABEL,UUID,FSTYPE,RM,HOTPLUG,SIZE,MODEL,ROTA';
 const AUTO_MOUNT_FS = new Set(['ext4', 'ext3', 'ext2', 'vfat', 'fat32', 'ntfs', 'exfat', 'apfs']);
 const attemptedAutoMount = new Set<string>();
 const MIN_DEVICE_BYTES = env.minDeviceBytes;
@@ -14,6 +14,7 @@ const MANUAL_MOUNT_BASE = env.manualMountBase;
 interface RawBlockDevice {
   name: string;
   kname?: string;
+  path?: string;
   type: string;
   mountpoint?: string;
   label?: string;
@@ -63,14 +64,18 @@ export interface DiskResponse {
 }
 
 export async function getDisks(): Promise<DiskResponse> {
+  await settleDevices();
   let devices = await readLsblk();
+  cleanupAutoMountCache(devices);
   const unmountedSmall = await ensureSmallDevicesUnmounted(devices);
   if (unmountedSmall) {
     devices = await readLsblk();
+    cleanupAutoMountCache(devices);
   }
   const autoMounted = await autoMountDevices(devices);
   if (autoMounted) {
     devices = await readLsblk();
+    cleanupAutoMountCache(devices);
   }
 
   const shareState = await loadShareState();
@@ -86,6 +91,7 @@ export async function getDisks(): Promise<DiskResponse> {
 }
 
 export async function mountDevice(device: string): Promise<void> {
+  await settleDevices();
   await mountWithFallback(device);
 }
 
@@ -116,10 +122,12 @@ async function autoMountTree(device: RawBlockDevice): Promise<boolean> {
     if (!attemptedAutoMount.has(id)) {
       attemptedAutoMount.add(id);
       try {
-        await mountWithFallback(`/dev/${id}`);
+        const path = device.path || `/dev/${id}`;
+        await mountWithFallback(path);
         mounted = true;
       } catch (error) {
         console.warn(`Auto-mount failed for /dev/${id}: ${(error as Error).message}`);
+        attemptedAutoMount.delete(id);
       }
     }
   }
@@ -143,6 +151,19 @@ function shouldAutoMount(device: RawBlockDevice): boolean {
     return false;
   }
   return Boolean(removable);
+}
+
+function cleanupAutoMountCache(devices: RawBlockDevice[]): void {
+  const currentIds = new Set<string>();
+  traverseDevices(devices, (device) => {
+    const id = device.kname ?? device.name;
+    if (id) currentIds.add(id);
+  });
+  Array.from(attemptedAutoMount).forEach((id) => {
+    if (!currentIds.has(id)) {
+      attemptedAutoMount.delete(id);
+    }
+  });
 }
 
 async function collectUsageMap(devices: RawBlockDevice[]): Promise<Map<string, DiskUsage>> {
@@ -226,7 +247,7 @@ function toDiskNode(device: RawBlockDevice, usageMap: Map<string, DiskUsage>, sh
     size: device.size,
     sizeBytes,
     type: device.type,
-    device: `/dev/${device.kname ?? device.name}`,
+    device: device.path || `/dev/${device.kname ?? device.name}`,
     model: device.model,
     isMounted: Boolean(mountpoint),
     mountpoint,
@@ -290,11 +311,12 @@ function pruneNode(node: DiskNode): DiskNode | null {
 }
 
 async function mountWithFallback(device: string): Promise<void> {
-  const udisks = await tryCommand('udisksctl', ['mount', '-b', device]);
+  const devicePath = await waitForDeviceNode(device);
+  const udisks = await tryCommand('udisksctl', ['mount', '-b', devicePath]);
   if (!udisks) {
-    await manualMount(device);
+    await manualMount(devicePath);
   }
-  await applyPermissionsForDevice(device);
+  await applyPermissionsForDevice(devicePath);
 }
 
 async function manualMount(device: string): Promise<void> {
@@ -322,6 +344,8 @@ async function ensureMountPoint(device: string): Promise<string> {
 }
 
 const UID_MOUNT_TYPES = new Set(['vfat', 'fat32', 'exfat', 'ntfs']);
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function buildMountOptions(fsType?: string): Promise<string | undefined> {
   if (!fsType) return undefined;
@@ -381,4 +405,18 @@ async function findMountPoint(device: string): Promise<string | undefined> {
   };
 
   return search(parsed.blockdevices);
+}
+
+async function settleDevices(): Promise<void> {
+  await tryCommand('udevadm', ['settle', '--timeout=5']);
+}
+
+async function waitForDeviceNode(device: string): Promise<string> {
+  const devName = device.startsWith('/dev/') ? device : `/dev/${device.replace(/^\/dev\//, '')}`;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await settleDevices().catch(() => undefined);
+    if (await fs.pathExists(devName)) return devName;
+    await delay(500);
+  }
+  throw new Error(`Device ${devName} not available`);
 }
