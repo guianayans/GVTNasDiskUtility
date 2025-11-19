@@ -234,20 +234,23 @@ O arquivo `docker-compose.yml` que está na raiz do projeto já inclui **dois se
 ```yaml
 services:
   gvtnas:
-    image: node:20
+    image: 'node:20'
+    container_name: gvtnas
+    working_dir: /app
     privileged: true
     volumes:
-      - /pendriver/GVTNas:/app
-      - /run/udev:/run/udev
-      - /mnt:/mnt
-      - /media:/media
-      - /var/lib/gvtnas-samba:/var/lib/samba
-      - /etc/gvtnas-samba:/etc/samba
-      - /pendriver/wireguard/config:/wg-config:ro
+      - '/pendriver/GVTNas:/app'
+      - '/dev:/dev'
+      - '/run/udev:/run/udev'
+      - '/mnt:/mnt'
+      - '/media:/media'
+      - '/var/lib/gvtnas-samba:/var/lib/samba'
+      - '/etc/gvtnas-samba:/etc/samba'
+      - '/pendriver/GVTNas/wireguard/config:/wg-config:ro'
     ports:
-      - 3010:3010
-      - 445:445
-      - 139:139
+      - '3010:3010'
+      - '445:445'
+      - '139:139'
     environment:
       APP_PASSWORD: ${APP_PASSWORD}
       VITE_APP_PASSWORD: ${APP_PASSWORD}
@@ -261,7 +264,22 @@ services:
       NAS_SMB_USER: ${NAS_SMB_USER:-nasuser}
       NAS_SMB_GROUP: ${NAS_SMB_GROUP:-nasuser}
     command: >
-      bash -c "apt-get update && ... && npm start"
+      bash -c '
+        set -e
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y samba samba-common-bin udisks2 ntfs-3g exfatprogs
+        useradd -M -s /usr/sbin/nologin ${NAS_SMB_USER:-nasuser} >/dev/null 2>&1 || true
+        service smbd start
+        PASS=${NAS_SMB_PASSWORD}
+        if ! pdbedit -L | grep -q "^${NAS_SMB_USER:-nasuser}:"; then
+          printf "%s\n%s\n" "$$PASS" "$$PASS" | smbpasswd -a -s ${NAS_SMB_USER:-nasuser}
+        else
+          printf "%s\n%s\n" "$$PASS" "$$PASS" | smbpasswd -s ${NAS_SMB_USER:-nasuser}
+        fi
+        npm_config_production=false npm ci --no-audit --no-fund
+        npm run build --if-present
+        npm start
+      '
     restart: unless-stopped
 
   wireguard:
@@ -270,21 +288,24 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
-    volumes:
-      - /pendriver/wireguard/config:/config
-      - /lib/modules:/lib/modules
     environment:
+      PUID: ${PUID:-0}
+      PGID: ${PGID:-0}
+      TZ: ${TZ:-America/Sao_Paulo}
       SERVERURL: ${SERVERURL}
       SERVERPORT: ${SERVERPORT:-51820}
       PEERS: ${PEERS:-iphone,macbook,windows}
-      TZ: ${TZ:-America/Sao_Paulo}
-      PUID: ${PUID:-0}
-      PGID: ${PGID:-0}
+      PEERDNS: ${PEERDNS:-1.1.1.1}
+      INTERNAL_SUBNET: ${INTERNAL_SUBNET:-10.10.0.0/24}
+    volumes:
+      - '/pendriver/GVTNas/wireguard/config:/config'
+      - '/lib/modules:/lib/modules'
     ports:
-      - 51820:51820/udp
+      - '51820:51820/udp'
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     restart: unless-stopped
+
 ```
 
 > Esse mesmo compose funciona em servidores bare metal e também em **Coolify (Docker Compose – Empty)**. Basta colar o conteúdo e definir as variáveis de ambiente no painel do Coolify.
