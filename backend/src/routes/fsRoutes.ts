@@ -54,7 +54,7 @@ router.get('/fs/download-zip', requireOpsToken, async (req, res, next) => {
   }
 });
 
-router.delete('/fs/delete', async (req, res, next) => {
+router.delete('/fs/delete', requireOpsToken, async (req, res, next) => {
   try {
     const targetPath = req.body?.path as string;
     if (!targetPath) {

@@ -292,22 +292,34 @@ export default function App() {
         : `Deseja excluir o arquivo "${entry.name}"?`;
       if (!window.confirm(confirmMessage)) return;
       try {
-        const response = await fetch(apiUrl('/api/fs/delete'), {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: entry.path }),
+        await withOpsToken(async (token) => {
+          const response = await fetch(apiUrl('/api/fs/delete'), {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-ops-token': token,
+            },
+            body: JSON.stringify({ path: entry.path }),
+          });
+          if (response.status === 401) {
+            const err = new Error('Token inválido');
+            (err as any).code = OPS_TOKEN_INVALID;
+            throw err;
+          }
+          if (!response.ok) throw new Error('Falha ao remover');
         });
-        if (!response.ok) throw new Error('Falha ao remover');
         showToast('Remoção concluída', 'success');
         if (fsPath) {
           await loadDirectory(fsPath);
         }
-      } catch (error) {
-        console.error(error);
-        showToast('Não foi possível remover o item', 'error');
+      } catch (error: any) {
+        if (error?.code !== OPS_TOKEN_INVALID) {
+          console.error(error);
+          showToast('Não foi possível remover o item', 'error');
+        }
       }
     },
-    [fsPath, loadDirectory, showToast]
+    [fsPath, loadDirectory, showToast, withOpsToken]
   );
 
   const openExplorer = async (disk: DiskNode) => {

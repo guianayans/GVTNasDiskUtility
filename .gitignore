@@ -7,3 +7,8 @@ backend/dist
 frontend/dist
 .env
 app-data
+
+# chaves privadas / estado de execução - nunca sobe
+wireguard/
+backend/data/
+.DS_Store
