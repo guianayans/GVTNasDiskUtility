@@ -111,7 +111,9 @@ export default function InstructionsOverlay({ open, onClose }: InstructionsOverl
           {error && <p className="text-rose-300">{error}</p>}
 
           <section className="space-y-3">
-            <h3 className="text-lg font-semibold">1. Configurar WireGuard</h3>
+            <h3 className="text-lg font-semibold">
+              {vpnEnabled ? '1. Configurar WireGuard' : '1. WireGuard (desativado)'}
+            </h3>
             {vpnEnabled ? (
             <>
             <p className="text-slate-400">
@@ -188,8 +190,12 @@ export default function InstructionsOverlay({ open, onClose }: InstructionsOverl
               <div className="glass rounded-2xl p-4 border border-white/10 space-y-1">
                 <p className="text-slate-200">A VPN embutida do GVTNas está desativada neste servidor.</p>
                 <p className="text-slate-400">
-                  Para acessar de fora de casa, conecte-se pela VPN que você já usa para chegar na sua rede e siga o passo 2.
-                  Dentro de casa, vá direto ao passo 2.
+                  Dentro de casa, vá direto ao passo 2. De fora, conecte-se antes pela VPN que você já usa para chegar na
+                  sua rede.
+                </p>
+                <p className="text-slate-400">
+                  Para usar a VPN embutida, defina <strong className="text-white">WIREGUARD=1</strong> nas variáveis de
+                  ambiente do GVTNas e refaça o deploy. Os aparelhos já configurados voltam a aparecer aqui.
                 </p>
               </div>
             )}
