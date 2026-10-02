@@ -51,18 +51,24 @@ services:
       '
     restart: unless-stopped
 
-  # VPN embutida (opcional). WIREGUARD=1 (padrão) liga; WIREGUARD=0 desliga: o container nem sobe
-  # e a porta 51820/udp não é publicada. Útil para quem já tem outra VPN para chegar na rede.
-  # As configurações dos aparelhos ficam guardadas em wireguard/config e voltam ao religar.
+  # VPN embutida (opcional). WIREGUARD=1 (padrão) liga; WIREGUARD=0 desliga: o container sobe mas
+  # fica parado, sem iniciar o WireGuard (nada escuta na 51820/udp). Ele continua existindo de
+  # propósito: sem container, o Coolify marca o serviço inteiro como "Degraded".
+  # Útil para quem já tem outra VPN para chegar na rede. As configurações dos aparelhos ficam
+  # guardadas em wireguard/config e voltam ao religar.
   wireguard:
     image: linuxserver/wireguard
     container_name: wireguard
-    deploy:
-      replicas: ${WIREGUARD:-1}
+    # sem cifrão de propósito (o Coolify mexe em valores com cifrão): lê a variável com printenv
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'if printenv WIREGUARD | grep -qx 0; then echo "VPN embutida desativada (WIREGUARD=0)"; trap "exit 0" TERM INT; while :; do sleep 3600 & wait; done; fi; exec /init'
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
     environment:
+      WIREGUARD: ${WIREGUARD:-1}
       PUID: ${PUID:-0}
       PGID: ${PGID:-0}
       TZ: ${TZ:-America/Sao_Paulo}
