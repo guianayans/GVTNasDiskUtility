@@ -26,4 +26,6 @@ export const env = {
     .map((root) => root.trim())
     .filter(Boolean),
   wireguardConfigPath: process.env.WIREGUARD_CONFIG_PATH ?? '/wg-config',
+  // VPN embutida ligada? (variável WIREGUARD do compose; só "0", "false", "no" e "off" desligam)
+  wireguardEnabled: !['0', 'false', 'no', 'off'].includes((process.env.WIREGUARD_ENABLED ?? '1').trim().toLowerCase()),
 };

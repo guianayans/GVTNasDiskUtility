@@ -28,6 +28,7 @@ interface InstructionsOverlayProps {
 export default function InstructionsOverlay({ open, onClose }: InstructionsOverlayProps) {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [peers, setPeers] = useState<PeerInfo[]>([]);
+  const [vpnEnabled, setVpnEnabled] = useState(true);
   const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
   const [peerDetail, setPeerDetail] = useState<PeerDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,6 +50,7 @@ export default function InstructionsOverlay({ open, onClose }: InstructionsOverl
         setSystemInfo(sysPayload);
         const peerList: PeerInfo[] = Array.isArray(peerPayload?.peers) ? peerPayload.peers : [];
         setPeers(peerList);
+        setVpnEnabled(peerPayload?.enabled !== false);
         setSelectedPeer((prev) => prev || peerList[0]?.name || null);
       } catch (err) {
         console.error(err);
@@ -110,6 +112,8 @@ export default function InstructionsOverlay({ open, onClose }: InstructionsOverl
 
           <section className="space-y-3">
             <h3 className="text-lg font-semibold">1. Configurar WireGuard</h3>
+            {vpnEnabled ? (
+            <>
             <p className="text-slate-400">
               Instale o aplicativo WireGuard no celular ou computador. Use os dados abaixo para conectar-se à sua rede.
             </p>
@@ -179,6 +183,16 @@ export default function InstructionsOverlay({ open, onClose }: InstructionsOverl
                 )}
               </div>
             </div>
+            </>
+            ) : (
+              <div className="glass rounded-2xl p-4 border border-white/10 space-y-1">
+                <p className="text-slate-200">A VPN embutida do GVTNas está desativada neste servidor.</p>
+                <p className="text-slate-400">
+                  Para acessar de fora de casa, conecte-se pela VPN que você já usa para chegar na sua rede e siga o passo 2.
+                  Dentro de casa, vá direto ao passo 2.
+                </p>
+              </div>
+            )}
           </section>
 
           <section className="space-y-3">

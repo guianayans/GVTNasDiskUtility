@@ -29,6 +29,9 @@ services:
       NAS_SMB_PASSWORD: ${NAS_SMB_PASSWORD}
       NAS_SMB_USER: ${NAS_SMB_USER:-nasuser}
       NAS_SMB_GROUP: ${NAS_SMB_GROUP:-nasuser}
+      # mesma variável que liga/desliga o serviço "wireguard" abaixo: com 0, a tela de instruções
+      # avisa que a VPN embutida está desativada em vez de mostrar QR codes de uma VPN parada
+      WIREGUARD_ENABLED: ${WIREGUARD:-1}
     command: >
       bash -c '
         set -e
@@ -48,9 +51,14 @@ services:
       '
     restart: unless-stopped
 
+  # VPN embutida (opcional). WIREGUARD=1 (padrão) liga; WIREGUARD=0 desliga: o container nem sobe
+  # e a porta 51820/udp não é publicada. Útil para quem já tem outra VPN para chegar na rede.
+  # As configurações dos aparelhos ficam guardadas em wireguard/config e voltam ao religar.
   wireguard:
     image: linuxserver/wireguard
     container_name: wireguard
+    deploy:
+      replicas: ${WIREGUARD:-1}
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
