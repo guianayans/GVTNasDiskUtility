@@ -49,6 +49,14 @@ services:
         npm run build --if-present
         npm start
       '
+    # o Coolify mostra "Running (healthy)" em vez de "Running (no healthcheck)".
+    # start_period longo: a cada subida o container instala pacotes e recompila antes de servir.
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:3010/']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
     restart: unless-stopped
 
   # VPN embutida (opcional). WIREGUARD=1 (padrão) liga; WIREGUARD=0 desliga: o container sobe mas
@@ -84,4 +92,11 @@ services:
       - '51820:51820/udp'
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
+    # saudável se a VPN está desligada de propósito (WIREGUARD=0) ou se a interface wg0 está no ar
+    healthcheck:
+      test: ['CMD-SHELL', 'printenv WIREGUARD | grep -qx 0 || wg show wg0 >/dev/null 2>&1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
