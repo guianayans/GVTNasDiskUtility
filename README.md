@@ -234,7 +234,7 @@ O arquivo `docker-compose.yml` que está na raiz do projeto já inclui **dois se
 ```yaml
 services:
   gvtnas:
-    image: 'node:20'
+    image: 'node:22'
     container_name: gvtnas
     working_dir: /app
     privileged: true
@@ -270,7 +270,8 @@ services:
         DEBIAN_FRONTEND=noninteractive apt-get install -y samba samba-common-bin udisks2 ntfs-3g exfatprogs
         useradd -M -s /usr/sbin/nologin ${NAS_SMB_USER:-nasuser} >/dev/null 2>&1 || true
         service smbd start
-        PASS=${NAS_SMB_PASSWORD}
+        PASS=`printenv NAS_SMB_PASSWORD || true`
+        if [ -z "$$PASS" ]; then echo "defina NAS_SMB_PASSWORD no Coolify (senha do Samba)"; exit 1; fi
         if ! pdbedit -L | grep -q "^${NAS_SMB_USER:-nasuser}:"; then
           printf "%s\n%s\n" "$$PASS" "$$PASS" | smbpasswd -a -s ${NAS_SMB_USER:-nasuser}
         else

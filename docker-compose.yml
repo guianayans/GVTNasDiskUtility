@@ -1,6 +1,6 @@
 services:
   gvtnas:
-    image: 'node:20'
+    image: 'node:22'
     container_name: gvtnas
     working_dir: /app
     privileged: true
@@ -39,12 +39,16 @@ services:
         DEBIAN_FRONTEND=noninteractive apt-get install -y samba samba-common-bin udisks2 ntfs-3g exfatprogs
         useradd -M -s /usr/sbin/nologin ${NAS_SMB_USER:-nasuser} >/dev/null 2>&1 || true
         service smbd start
-        PASS=${NAS_SMB_PASSWORD}
+        # a senha vem do ambiente do container, lida com printenv (sem cifrão: o Coolify mexe em valores
+        # com cifrão). Assim ela não fica escrita no comando, que aparece no docker inspect e no ps do servidor
+        PASS=`printenv NAS_SMB_PASSWORD || true`
+        if [ -z "$$PASS" ]; then echo "defina NAS_SMB_PASSWORD no Coolify (senha do Samba)"; exit 1; fi
         if ! pdbedit -L | grep -q "^${NAS_SMB_USER:-nasuser}:"; then
           printf "%s\n%s\n" "$$PASS" "$$PASS" | smbpasswd -a -s ${NAS_SMB_USER:-nasuser}
         else
           printf "%s\n%s\n" "$$PASS" "$$PASS" | smbpasswd -s ${NAS_SMB_USER:-nasuser}
         fi
+        unset PASS
         npm_config_production=false npm ci --no-audit --no-fund
         npm run build --if-present
         npm start
